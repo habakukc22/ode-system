@@ -1,0 +1,153 @@
+# 1. Constantes Físicas (Valores consolidados para Y2O3)
+n1 = 2.3e20 #população de Er3+ (cm^-3)
+n4 = 1.3e21 #população de Yb3+ (cm^-3)
+k54 = 1279.0  # s^-1
+k31 = 192.0   # s^-1
+k21 = 16.66   # s^-1
+sigma = 1.75e-20 # cm^2
+P = 5.4e20    # fótons / (cm^2 * s) (baseado em 110 W/cm^2)
+
+#Estimativa inicial
+W51 = 1e-17
+W52 = 1.2*W51
+
+amplitude = 0.5
+offset = 0.8
+
+# Ajustando novos parâmetros
+wp51 = lambda omega: 2*np.pi*W51*n1/omega
+wp52 = lambda omega: 2*np.pi*W52*n1/omega
+kp21 = lambda omega: 2*np.pi*k21/omega
+kp31 = lambda omega: 2*np.pi*k31/omega
+kp51 = lambda omega: 2*np.pi*k54/omega
+kp45 = lambda omega: 2*np.pi*sigma*P/omega
+kp54 = lambda omega: 2*np.pi*k54/omega
+x4 = n4/n1
+
+# Diferença de fase experimental freq, ph_diff, error_pd
+# Exemplo com 3 frequências extraídas da sua Figura 12
+pd = np.array([[ 1.00000000e+00, -2.78640057e-03,  3.36729982e-03],
+       [ 2.00000000e+00, -2.94542499e-03,  3.30445647e-03],
+       [ 3.00000000e+00, -5.70062310e-03,  2.22292791e-03],
+       [ 5.00000000e+00, -1.15347657e-03,  3.38780739e-03],
+       [ 7.00000000e+00, -1.14123889e-02,  3.33181254e-03],
+       [ 1.00000000e+01, -7.57860157e-03,  3.31657015e-03],
+       [ 2.00000000e+01, -1.25420350e-02,  3.19388745e-03],
+       [ 3.00000000e+01, -1.16159364e-02,  3.66126559e-03],
+       [ 5.00000000e+01, -2.39443326e-02,  3.09906367e-03],
+       [ 7.00000000e+01, -3.15226287e-02,  2.85755006e-03],
+       [ 1.00000000e+02, -5.28665836e-02,  3.35273380e-03],
+       [ 2.00000000e+02, -8.30688285e-02,  2.73059639e-03],
+       [ 3.00000000e+02, -1.33267253e-01,  4.03296653e-03],
+       [ 5.00000000e+02, -2.24394939e-01,  3.47703795e-03],
+       [ 7.00000000e+02, -3.65668758e-01,  3.51463917e-03],
+       [ 1.00000000e+03, -4.71239925e-01,  3.47630975e-03],
+       [ 2.00000000e+03, -6.40636375e-01,  3.75070348e-03],
+       [ 3.00000000e+03, -8.06144725e-01,  3.44250145e-03],
+       [ 5.00000000e+03, -9.67168365e-01,  2.84889823e-03],
+       [ 7.00000000e+03, -1.18290875e+00,  3.72268580e-03],
+       [ 1.00000000e+04, -1.34746600e+00,  4.92232407e-03],
+       [ 2.00000000e+04, -1.40335577e+00,  8.13990120e-03],
+       [ 3.00000000e+04, -1.48759587e+00,  1.57209815e-02],
+       [ 5.00000000e+04, -1.34833651e+00,  2.13302156e-02],
+       [ 7.00000000e+04, -1.28640332e+00,  3.61040996e-02],
+       [ 1.00000000e+05, -1.23208184e+00,  6.92253145e-02]])
+
+def odes(t, x, freq):
+    # o t agora é tau
+    x5, x2, x3 = x
+    omega = 2 * np.pi * freq
+    
+    # Função do laser conforme seus dados experimentais
+    F_t = offset + amplitude * np.cos(2*np.pi * t)
+    
+    # Prevenção numérica: a intensidade não pode ser negativa
+    if F_t < 0: F_t = 0.0 
+    
+    dx5_dt = kp45(omega) * F_t * x4 - wp51(omega) * x5 - wp52(omega) * x2 * x5 - kp54(omega) * x5
+    dx2_dt = wp51(omega) * x5 - wp52(omega) * x2 * x5 - kp21(omega) * x2
+    dx3_dt = wp52(omega) * x2 * x5 - kp31(omega) * x3
+    
+    return [dx5_dt, dx2_dt, dx3_dt]
+
+# 3. Função para Extrair a Fase via FFT
+def extrair_fase(t, n3, freq):
+    # DICA CRUCIAL: Descartar a primeira metade da simulação (o transiente)
+    # Analisamos apenas a parte onde a onda já estabilizou
+    meio = len(t) // 2
+    t_estavel = t[meio:]
+    n3_estavel = n3[meio:]
+    
+    # Recria o sinal do laser no mesmo intervalo de tempo para comparação
+    laser_estavel = offset + amplitude * np.cos(2 * np.pi * freq * t_estavel)
+    
+    N = len(t_estavel)
+    dt = t_estavel[1] - t_estavel[0]
+    
+    # Aplica a FFT
+    yf_n3 = fft(n3_estavel)
+    yf_laser = fft(laser_estavel)
+    xf = fftfreq(N, dt)
+    
+    # Encontra o índice da frequência de modulação (freq) no array da FFT
+    idx = np.argmin(np.abs(xf - freq))
+    
+    # Extrai o ângulo (fase) de ambos os sinais nesse pico de frequência
+    fase_n3 = np.angle(yf_n3[idx])
+    fase_laser = np.angle(yf_laser[idx])
+    
+    # Diferença de fase (Luminescência - Laser)
+    delta_fase = fase_n3 - fase_laser
+    
+    # Garante que o valor fique no intervalo correto [-pi, pi]
+    delta_fase = np.angle(np.exp(1j * delta_fase))
+    
+    return delta_fase
+
+pd_simulated = []
+num_points = 20 #len(pd)
+
+for freq in pd[:num_points,0]:
+
+    #define as EDOS
+    def odes(t, x, freq):
+     # o t agora é tau
+     x5, x2, x3 = x
+     omega = 2 * np.pi * freq
+
+     # Função do laser conforme seus dados experimentais
+     F_t = offset + amplitude * np.cos(2*np.pi * t)
+
+     # Prevenção numérica: a intensidade não pode ser negativa
+     if F_t < 0: F_t = 0.0 
+
+     dx5_dt = kp45(omega) * F_t * x4 - wp51(omega) * x5 - wp52(omega) * x2 * x5 - kp54(omega) * x5
+     dx2_dt = wp51(omega) * x5 - wp52(omega) * x2 * x5 - kp21(omega) * x2
+     dx3_dt = wp52(omega) * x2 * x5 - kp31(omega) * x3
+
+     return [dx5_dt, dx2_dt, dx3_dt]
+    
+    t_span = (0, 500) # Simula alguns ciclos
+    # W51 = 1e-20
+    # W52 = 1e-20
+    x0 = [0, 0, 0]
+
+    t_eval = np.linspace(t_span[0], t_span[-1], 10000)
+
+    sol = solve_ivp(
+        odes, 
+        t_span, 
+        x0, 
+        t_eval=t_eval,
+        args=freq,
+        method="Radau"
+        )
+    
+    n3 = (sol.y[2])*n1
+    ts = (sol.t)*(2*np.pi/freq)
+    
+    pd_simulated.append(
+        [freq, extrair_fase(ts, n3, freq)]
+        )
+    
+pd_simulated = np.array(pd_simulated)
