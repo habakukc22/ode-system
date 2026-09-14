@@ -1,0 +1,43 @@
+Abaixo, CP significa Componente e CX siginifica conexão.
+
+CP 1: Arduino Giga
+    CX 1: USB C (ligado no PC) 
+    CX 2: APDA 
+    CX 3: PWMA OUT 
+    CX 4: Trigger
+
+CP 2: APD Buffer
+    CX 0: cabo vindo da APD
+    CX 1: ligado a CX 2 de CP 1
+    CX 2: ligado a contadora
+    CX 3: não conectado
+    CX 4: não conctado
+
+CP 3: Contadora
+    CX 1 (Output 2mV/cnt): Ligado a DAQ 
+    CX 2 (input 50ohms): ligado a CX 2 de CP 2 
+
+CP 4: Gerador de Função 
+    CX 1 (Sync TTL): ligado a CX 4 de CP 1
+    CX 2: AM IN driver AOM
+
+CP 5: DC Power Supply 
+    CX +: Driver do AOM
+    CX -: Driver do AOM
+
+CP 6: DAQ (Digital Acquition Board - National Instruments) 
+    CX 1 (AI 1): ligado a CX 1 de CP 3 
+    CX 2 (AO 1): ligado a CX 2 de CP 7 
+    CX 3 (AO 0): ligado a CX 1 de CP 7 
+
+CP 7: Amplificador para o piezo
+    CX 1 (input 0-12V): ligado a CX 3 de CP 6 (controla eixo x do piezo)
+    CX 2 (input 0-12V): ligado a CX 2 de CP 6 (controla eixo y do piezo)
+    CX 3 (input 0-12V): ligado a outro Arduino Giga (diferente de CP 1) (controla eixo z do piezo) 
+    CX 4 (output 0-120V, associado a CX 1): Para o piezo 
+    CX 5 (output 0-120V, associado a CX 2): Para o piezo 
+    CX 6 (output 0-120V, associado a CX 3): Para o piezo 
+
+Comentários:
+    i) A função do amplificador é amplificar a tensão mandada pela DAQ (de 0 a 12V) para o piezo (de 0 até 100V eu acho)
+    ii) entre CP 7 e o piezo há uma chave de segurança no circuito que mantemos fechada ao ligar e desligar CP 7
